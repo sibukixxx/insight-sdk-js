@@ -15,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./analytical": {
+      "types": "./dist/analytical.d.ts",
+      "default": "./dist/analytical.js"
     }
   },
   "files": [
