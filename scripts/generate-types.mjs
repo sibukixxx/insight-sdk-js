@@ -43,6 +43,7 @@ function tsType(prop) {
   if (prop.$ref) return prop.$ref.split("/").pop();
   if (prop.const !== undefined) return JSON.stringify(prop.const);
   if (prop.enum) return prop.enum.map((v) => JSON.stringify(v)).join(" | ");
+  if (Array.isArray(prop.type)) return prop.type.map((t) => (t === "null" ? "null" : tsType({ ...prop, type: t }))).join(" | ");
   switch (prop.type) {
     case "string":
       return "string";
@@ -54,6 +55,11 @@ function tsType(prop) {
     case "array":
       return `${wrap(tsType(prop.items ?? {}))}[]`;
     case "object":
+      if (prop.properties) {
+        const required = new Set(prop.required ?? []);
+        const fields = Object.entries(prop.properties).map(([k, v]) => `${k}${required.has(k) ? "" : "?"}: ${tsType(v)}`);
+        return `{ ${fields.join("; ")} }`;
+      }
       if (prop.additionalProperties && typeof prop.additionalProperties === "object") {
         return `Record<string, ${tsType(prop.additionalProperties)}>`;
       }

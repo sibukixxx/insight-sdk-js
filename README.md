@@ -36,9 +36,10 @@ Example: `node example/minimal.ts http://127.0.0.1:8787` (Node >= 22.18 runs the
 
 | SDK version | Contract versions | Pinned contract source |
 |---|---|---|
-| 0.1.x | `1` (`insightContractVersions`) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
+| 0.2.x | `1` (adds InputSource, ExecutionProfile, run comparison, re-evaluation, timeline, temporal operations, scenarios, data triage) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
+| 0.1.x | `1` (original v0 surface) | insight `e6e402d` |
 
-Unknown response fields are ignored; a different `contractVersion` fails with `UNSUPPORTED_CONTRACT_VERSION`. InputSource (insight #90) and ExecutionProfile (insight #91) support are additive follow-ups (#4, #5).
+Unknown response fields are ignored; a different `contractVersion` fails with `UNSUPPORTED_CONTRACT_VERSION`. 0.2.0 added InputSource / RawArtifact (insight #90, #4) and ExecutionProfile (insight #91, #5) additively; every 0.1 call keeps working. Requests with an idempotency key get `contractVersion` and a random `idempotencyKey` filled in; stateless requests (e.g. `applyTemporalOperation`) get only `contractVersion`.
 
 ## Development
 
@@ -47,7 +48,7 @@ Unknown response fields are ignored; a different `contractVersion` fails with `U
 | `npm run generate` | Regenerate `src/contract.gen.ts` from the pinned `contract/v1/schema.json` |
 | `npm run check-generated` | Fail if the generated types are stale |
 | `npm run typecheck` | Type-check with `tsc` |
-| `npm test` | Unit, drift and (with `INSIGHT_DETERMINISTIC_URL` / `INSIGHT_MODEL_BACKED_URL`) live conformance tests |
+| `npm test` | Unit, drift and (with `INSIGHT_DETERMINISTIC_URL` / `INSIGHT_MODEL_BACKED_URL`) live conformance tests. Fixtures 08/09 need the engine started with `-input-root contract/v1/fixtures/data -heavy-dir <dir>` |
 | `npm run build` | Emit `dist/` (not committed) for packaging |
 
 Not published to npm yet.

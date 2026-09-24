@@ -4,7 +4,7 @@
 export const CONTRACT_SCHEMA = "insight-lab.public-engine";
 export const CONTRACT_VERSION = "1";
 
-export const ERROR_CODES = ["INVALID_REQUEST","UNSUPPORTED_CONTRACT_VERSION","NOT_FOUND","IDEMPOTENCY_CONFLICT","IDENTITY_CONFLICT","ANALYSIS_NOT_COMPLETED","ANALYSIS_HAS_NO_HYPOTHESES","MIXED_ANALYSIS_RUNS","INTERNAL"] as const;
+export const ERROR_CODES = ["INVALID_REQUEST","UNSUPPORTED_CONTRACT_VERSION","NOT_FOUND","IDEMPOTENCY_CONFLICT","IDENTITY_CONFLICT","ANALYSIS_NOT_COMPLETED","ANALYSIS_HAS_NO_HYPOTHESES","MIXED_ANALYSIS_RUNS","STALE_ITERATION","EXECUTION_PROFILE_UNAVAILABLE","INPUT_SOURCE_UNAVAILABLE","INPUT_VERIFICATION_FAILED","INTERNAL"] as const;
 export type ContractErrorCode = (typeof ERROR_CODES)[number];
 
 export type ContractVersion = "1";
@@ -41,6 +41,8 @@ export interface EngineInfo {
   engine: EngineBuild;
   researchArtifact: SchemaRef;
   analyticalArtifact: SchemaRef;
+  executionProfiles?: ExecutionProfileInfo[];
+  inputSourceKinds?: ("INLINE_DOCUMENT" | "ANALYTICAL_ARTIFACT" | "RAW_ARTIFACT")[];
 }
 
 export interface CreateSubjectRequest {
@@ -69,12 +71,13 @@ export interface EvidenceDocument {
   metadata?: Metadata;
 }
 
-/** At least one document or analytical artifact is required. Artifacts follow contracts/analytical-artifact/v1/schema.json. */
+/** At least one document, analytical artifact or input source is required. Artifacts follow contracts/analytical-artifact/v1/schema.json. */
 export interface AddEvidenceRequest {
   contractVersion: ContractVersion;
   idempotencyKey: IdempotencyKey;
   documents?: EvidenceDocument[];
   analyticalArtifacts?: Record<string, unknown>[];
+  inputSources?: InputSource[];
 }
 
 export interface EvidenceItemReceipt {
@@ -90,6 +93,7 @@ export interface EvidenceReceipt {
   subjectId: string;
   documents: EvidenceItemReceipt[];
   analyticalArtifacts: EvidenceItemReceipt[];
+  inputSources?: InputSourceReceipt[];
 }
 
 export interface StartAnalysisRequest {
@@ -98,6 +102,7 @@ export interface StartAnalysisRequest {
   label?: string;
   note?: string;
   semanticAnalysisMode?: "DISCOVERY" | "DATASET_ANALYSIS" | "RESEARCH_REVIEW";
+  executionProfile?: ExecutionProfile;
 }
 
 /** The run's execution and input snapshots, verbatim. A snapshot the run never recorded is omitted, never sent empty. */
@@ -116,6 +121,7 @@ export interface AnalysisRun {
   note?: string;
   semanticAnalysisMode?: string;
   executionMode?: "deterministic" | "model_backed";
+  executionProfile?: ExecutionProfileResolution;
   engine?: EngineBuild;
   executionFingerprint?: string;
   inputFingerprint?: string;
@@ -163,6 +169,16 @@ export interface CreateResearchRunRequest {
   analysisId: string;
   inputReferences?: string[];
   semanticAnalysisMode?: "DISCOVERY" | "DATASET_ANALYSIS" | "RESEARCH_REVIEW";
+  observationWindow?: ObservationWindow;
+}
+
+/** As-of boundary of a longitudinal iteration (#71). A later iteration may not use an earlier asOf than one already recorded. */
+export interface ObservationWindow {
+  asOf: string;
+  start?: string;
+  end?: string;
+  basis?: string;
+  note?: string;
 }
 
 export interface AddedEvidenceLink {
@@ -178,6 +194,7 @@ export interface AppendIterationRequest {
   analysisId: string;
   question?: string;
   addedEvidence?: AddedEvidenceLink[];
+  observationWindow?: ObservationWindow;
 }
 
 export interface ResearchResult {
@@ -191,12 +208,696 @@ export interface ResearchResult {
   artifact: Record<string, unknown>;
 }
 
+export interface AnalysisList {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  /** Every analysis run of the subject, oldest first. */
+  analyses: AnalysisRun[];
+}
+
+export interface RunComparisonResult {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  comparison: RunComparison;
+}
+
+/** Non-persistent comparison of two analysis runs of one subject (#83). It attributes a result delta to the input or execution axis. It never judges which run is better and never claims a cause. */
+export interface RunComparison {
+  from: RunRef;
+  to: RunRef;
+  input: InputAxisDiff;
+  execution: ExecutionAxisDiff;
+  attribution: "SAME_CONFIGURATION" | "EXECUTION_CHANGE" | "INPUT_CHANGE" | "CONFOUNDED" | "ATTRIBUTION_UNAVAILABLE";
+  repeatGroups: RepeatGroup[];
+  metrics: MetricDelta[];
+  insights: InsightResultDiff;
+  /** The first entry always states that differences are not evidence of cause. */
+  explanation: string[];
+}
+
+export interface RunRef {
+  analysisId: string;
+  status: string;
+  createdAt: string;
+  /** Absent when not recorded; never read as the same as another run. */
+  inputFingerprint?: string;
+  /** Absent when not recorded; never read as the same as another run. */
+  executionFingerprint?: string;
+}
+
+export type AxisState = "SAME" | "CHANGED" | "UNKNOWN";
+
+export interface FieldChange {
+  field: string;
+  /** Empty when the field was absent. */
+  from: string;
+  /** Empty when the field was absent. */
+  to: string;
+}
+
+export interface ExecutionAxisDiff {
+  state: AxisState;
+  /** Field-level diff: engineVersion, gitCommit, gitDirty, executionMode, semanticAnalysisMode, ruleVersions.*, promptVersion, promptFingerprint, provider, models.*, parameters. */
+  changes: FieldChange[];
+}
+
+export interface InputAxisDiff {
+  state: AxisState;
+  /** source:contentHash:metadataHash identities. */
+  documentsAdded: string[];
+  documentsRemoved: string[];
+  datasetHashesAdded: string[];
+  datasetHashesRemoved: string[];
+  /** datasetId@schemaVersion:fileHash identities. */
+  datasetsAdded: string[];
+  datasetsRemoved: string[];
+}
+
+export interface MetricDelta {
+  metric: string;
+  from: number | null;
+  to: number | null;
+  /** Null unless both runs recorded the metric. */
+  delta: number | null;
+}
+
+export interface InsightMatch {
+  fromInsightId: string;
+  toInsightId: string;
+  method: "EXACT_EVIDENCE_SPANS" | "EVIDENCE_SPAN_OVERLAP" | "HYPOTHESIS_COMPARISON_KEY";
+  score: number;
+  changes: FieldChange[];
+}
+
+export interface InsightResultDiff {
+  added: string[];
+  removed: string[];
+  matched: InsightMatch[];
+}
+
+export interface MetricRange {
+  metric: string;
+  min: number;
+  max: number;
+}
+
+export interface RepeatGroup {
+  /** inputFingerprint|executionFingerprint. */
+  key: string;
+  analysisIds: string[];
+  runs: number;
+  /** False for a single run: variation is unknown, not zero. */
+  variationKnown: boolean;
+  metrics: MetricRange[];
+}
+
+export interface ResearchRunSummary {
+  researchRunId: string;
+  question: string;
+  iterationCount: number;
+  latestIterationId: string;
+  latestIterationSequence: number;
+  createdAt: string;
+}
+
+export interface ResearchRunList {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  researchRuns: ResearchRunSummary[];
+}
+
+export interface ReEvaluationTrigger {
+  kind: "MANUAL" | "SCHEDULED";
+  /** Opaque name of the scheduler or person; never interpreted. */
+  source?: string;
+}
+
+export interface EvidenceChanges {
+  added: string[];
+  removed: string[];
+  changed: string[];
+}
+
+/** Re-evaluate a research run because new evidence arrived (#74). analysisId names a completed analysis run over the new evidence. The engine schedules nothing itself. */
+export interface ReEvaluationRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  /** Caller correlation id. Reusing it with the same analysisId returns ALREADY_EVALUATED; with another analysisId it is IDEMPOTENCY_CONFLICT. */
+  correlationKey: string;
+  /** Must be the latest iteration, otherwise STALE_ITERATION. */
+  previousIterationId: string;
+  analysisId: string;
+  trigger: ReEvaluationTrigger;
+  evidenceChanges: EvidenceChanges;
+  affectedGapIds?: string[];
+  note?: string;
+}
+
+/** Audit record attached to the iteration a re-evaluation created. Earlier iterations are never modified. */
+export interface ReEvaluationRecord {
+  correlationKey: string;
+  previousIterationId: string;
+  trigger: ReEvaluationTrigger;
+  evidenceChanges: EvidenceChanges;
+  affectedGapIds: string[];
+  affectedHypothesisIds: string[];
+  /** Partial re-evaluation is not yet proven safe, so the whole iteration is re-evaluated. */
+  scope: "FULL";
+  scopeReason: string;
+  inputFingerprintBefore?: string;
+  inputFingerprintAfter?: string;
+  executionFingerprintBefore?: string;
+  executionFingerprintAfter?: string;
+  note?: string;
+  recordedAt: string;
+}
+
+export interface ReEvaluationResult {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  researchRunId: string;
+  /** NEW_ITERATION returns 201; the others return 200 and append nothing. */
+  status: "NEW_ITERATION" | "NO_EVIDENCE_CHANGE" | "ALREADY_EVALUATED";
+  reEvaluation: ReEvaluationRecord;
+  result: ResearchResult;
+}
+
+/** Longitudinal read model of a research run (#71). Evidence/world changes and instrument (engine/model/prompt/rules) changes are separate arrays and are never merged. Derived from immutable iterations; historical entries never change when iterations are appended. */
+export interface ResearchTimeline {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  researchRunId: string;
+  question: string;
+  asOf?: string;
+  iterations: TimelineIteration[];
+  evidenceEvents: EvidenceEvent[];
+  observationDeltas: TimelineObservationDelta[];
+  hypothesisEvents: HypothesisEvent[];
+  insightVersions: InsightVersion[];
+  instrumentChanges: InstrumentChange[];
+  limitations: string[];
+}
+
+export interface TimelineIteration {
+  iterationId: string;
+  sequence: number;
+  previousIterationId?: string;
+  analysisId?: string;
+  observationWindow?: ObservationWindow;
+  question: string;
+  readiness: string;
+  stopped: boolean;
+  unresolvedGapIds?: string[];
+  whatWeCannotConclude?: string[];
+  carriedUncertainty?: string[];
+  resolvedUncertainty?: string[];
+  recordedAt: string;
+}
+
+export interface EvidenceEvent {
+  iterationId: string;
+  sequence: number;
+  kind: "ADDED" | "REMOVED" | "CONTENT_CHANGED" | "DEFINITION_CHANGED";
+  reference: string;
+  gapIds?: string[];
+  detail?: string;
+}
+
+export interface TimelineObservationDelta {
+  fromIterationId: string;
+  toIterationId: string;
+  seriesKey: string;
+  /** Deterministic #70 Observation Delta, verbatim. Descriptive, never causal. */
+  delta: Record<string, unknown>;
+}
+
+export interface HypothesisEvent {
+  iterationId: string;
+  sequence: number;
+  hypothesisId: string;
+  evolution: "CREATED" | "UNCHANGED" | "STRENGTHENED" | "WEAKENED" | "CONTRADICTED";
+  reason: string;
+  evidenceRefs?: string[];
+  attribution: ChangeAttribution;
+  invalidatesPriorInterpretation: boolean;
+}
+
+export interface InsightVersion {
+  iterationId: string;
+  sequence: number;
+  insightIds?: string[];
+  explanation?: string[];
+  attribution: ChangeAttribution;
+}
+
+/** Execution fingerprint of consecutive iterations' analyses. UNKNOWN means not recorded, never SAME. */
+export interface InstrumentChange {
+  fromIterationId: string;
+  toIterationId: string;
+  execution: "CHANGED" | "UNKNOWN";
+  changedFields?: string[];
+}
+
+/** Stateless #73 temporal operation. Nothing is stored; the derived artifact is neutral evidence that may later be submitted with addEvidence. */
+export interface TemporalOperationRequest {
+  contractVersion: ContractVersion;
+  /** insight-lab.analytical-artifact v1 with temporal results. */
+  artifact: Record<string, unknown>;
+  /** insight-lab.temporal-operation v1 spec; see contracts/analytical-artifact/v1/temporal-operation.schema.json. */
+  operation: Record<string, unknown>;
+}
+
+export interface TemporalOperationResult {
+  contractVersion: ContractVersion;
+  /** Derived insight-lab.analytical-artifact v1 (origin=derived, deterministic, provenance references the source artifact). */
+  artifact: Record<string, unknown>;
+}
+
+export type ChangeAttribution = "EVIDENCE_DELTA" | "INSTRUMENT_CHANGE" | "EVIDENCE_AND_INSTRUMENT" | "UNATTRIBUTED";
+
+/** Resource/runtime strategy (#91). Separate from semanticAnalysisMode, research stage and executionMode; it never changes hypothesis, validation or readiness semantics. Omitted means AUTO. */
+export type ExecutionProfile = "LIGHT" | "STANDARD" | "HEAVY" | "AUTO";
+
+export interface ExecutionProfileInfo {
+  profile: ExecutionProfile;
+  available: boolean;
+  description: string;
+}
+
+/** Which profile a run used and why. AUTO resolves deterministically from input shape; an unavailable profile fails with EXECUTION_PROFILE_UNAVAILABLE instead of downgrading. Recorded in provenance.execution, not in the execution fingerprint. */
+export interface ExecutionProfileResolution {
+  requested: ExecutionProfile;
+  resolved: "LIGHT" | "STANDARD" | "HEAVY";
+  reason: string;
+  strategyVersion: string;
+}
+
+/** Reference to raw bytes held outside the engine. sha256 and sizeBytes are claims: the engine streams the bytes, measures them itself and rejects a mismatch with INPUT_VERIFICATION_FAILED. Supported URI schemes depend on the resolvers the engine is configured with (Core ships file:<relative path> under a configured root). */
+export interface RawArtifactRef {
+  uri: string;
+  mediaType: string;
+  name?: string;
+  version?: string;
+  sizeBytes?: number;
+  sha256?: string;
+}
+
+/** Declarative deterministic preparation of a raw CSV into an Analytical Artifact. Unknown fields are rejected. Sums are exact, so partitioned (HEAVY) and single-pass (STANDARD) preparation produce the same artifact. */
+export interface PreparationSpec {
+  kind: "csv-aggregate/v1";
+  metrics: ({ id: string; name: string; column?: string; aggregation: "sum" | "mean" | "count" | "min" | "max"; unit: string })[];
+  dimensionColumns?: string[];
+  periodColumn?: string;
+  period?: { start: string; end: string; basis?: string };
+  population: { description: string; unit?: string };
+}
+
+/** Additive input variant (#90). kind RAW_ARTIFACT registers an engine-verified reference. With preparation, the bytes are prepared into an Analytical Artifact when an analysis runs on STANDARD or HEAVY; without it the reference is recorded for provenance only and never analyzed as text. */
+export interface InputSource {
+  externalRef: string;
+  kind: "RAW_ARTIFACT";
+  title?: string;
+  rawArtifact: RawArtifactRef;
+  preparation?: PreparationSpec;
+  metadata?: Metadata;
+}
+
+export interface InputSourceReceipt {
+  externalRef: string;
+  documentId: string;
+  status: "CREATED" | "UNCHANGED";
+  sha256: string;
+  sizeBytes: number;
+  verifiedBy: "engine";
+  preparation: "PENDING" | "NOT_REQUESTED";
+  preparedArtifactId?: string;
+}
+
 export interface ErrorBody {
-  code: "INVALID_REQUEST" | "UNSUPPORTED_CONTRACT_VERSION" | "NOT_FOUND" | "IDEMPOTENCY_CONFLICT" | "IDENTITY_CONFLICT" | "ANALYSIS_NOT_COMPLETED" | "ANALYSIS_HAS_NO_HYPOTHESES" | "MIXED_ANALYSIS_RUNS" | "INTERNAL";
+  code: "INVALID_REQUEST" | "UNSUPPORTED_CONTRACT_VERSION" | "NOT_FOUND" | "IDEMPOTENCY_CONFLICT" | "IDENTITY_CONFLICT" | "ANALYSIS_NOT_COMPLETED" | "ANALYSIS_HAS_NO_HYPOTHESES" | "MIXED_ANALYSIS_RUNS" | "STALE_ITERATION" | "EXECUTION_PROFILE_UNAVAILABLE" | "INPUT_SOURCE_UNAVAILABLE" | "INPUT_VERIFICATION_FAILED" | "INTERNAL";
   message: string;
 }
 
 export interface ErrorResponse {
   contractVersion: ContractVersion;
   error: ErrorBody;
+}
+
+/** INCLUDE: deterministic processing should compute with the variable. DEFER: kept for later. NEEDS_REVIEW: definition or relevance unclear (UNKNOWN is preserved). EXCLUDE: a human chose not to process it; only HUMAN revisions may exclude and exclusion never deletes source data. */
+export type TriageBucket = "INCLUDE" | "DEFER" | "NEEDS_REVIEW" | "EXCLUDE";
+
+export type TriageRole = "METRIC" | "DIMENSION" | "PERIOD" | "IDENTIFIER";
+
+/** Candidate research roles. Hypotheses about a variable, never causal findings. */
+export type TriageClassification = "POSSIBLE_OUTCOME" | "POSSIBLE_EXPOSURE" | "POSSIBLE_CONFOUNDER" | "POSSIBLE_MEDIATOR" | "POSSIBLE_COLLIDER" | "COMPARISON_CANDIDATE" | "DEFINITION_UNKNOWN";
+
+export interface DatasetRef {
+  id: string;
+  version: string;
+  /** sha256:<hex> of the profiled bytes. When sent it must match; responses always carry the engine-computed value. */
+  sha256?: string;
+}
+
+/** Exactly one of csv (inline, at most 8 MiB) or documentId (an evidence document of the subject) is required. */
+export interface CreateDatasetProfileRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  dataset: DatasetRef;
+  csv?: string;
+  documentId?: string;
+}
+
+export interface ColumnProfile {
+  name: string;
+  type: "INTEGER" | "NUMBER" | "BOOLEAN" | "DATE" | "STRING" | "EMPTY";
+  nonNullCount: number;
+  nullCount: number;
+  /** Stops counting at 10000 (distinctCapped). */
+  distinctCount: number;
+  distinctCapped: boolean;
+  min?: string;
+  max?: string;
+  sampleValues: string[];
+}
+
+/** Deterministic, bounded metadata. Identical bytes give an identical profileFingerprint. Raw rows are never stored or returned. */
+export interface DatasetProfile {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  profileId: string;
+  dataset: DatasetRef;
+  documentId?: string;
+  contentSha256: string;
+  rowCount: number;
+  columns: ColumnProfile[];
+  profilerVersion: string;
+  profileFingerprint: string;
+  createdAt: string;
+}
+
+export interface TriageGapRef {
+  gapId: string;
+  need: string;
+  requiredDimensions?: string[];
+}
+
+/** researchRunId adds the unresolved ResearchGaps and DataRequirements of that run's latest iteration to gaps (re-triage). */
+export interface TriageRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  question: string;
+  /** Default DETERMINISTIC. MODEL requires a configured model; its output passes the same normalization. */
+  triager?: "DETERMINISTIC" | "MODEL";
+  hypothesisIds?: string[];
+  gaps?: TriageGapRef[];
+  researchRunId?: string;
+}
+
+export interface PlanProposer {
+  kind: "DETERMINISTIC" | "MODEL" | "HUMAN";
+  actor?: string;
+  model?: string;
+}
+
+export interface VariableDecision {
+  name: string;
+  bucket: TriageBucket;
+  role?: TriageRole;
+  classifications?: TriageClassification[];
+  rationale: string;
+  linkedGapIds?: string[];
+}
+
+export interface PlanMove {
+  name: string;
+  fromBucket?: TriageBucket;
+  toBucket: TriageBucket;
+  role?: TriageRole;
+  classifications?: TriageClassification[];
+  rationale: string;
+}
+
+/** One immutable version. decisions lists every profiled column exactly once, in profile order. moves records how this version differs from its parent. */
+export interface SelectionPlan {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  planId: string;
+  profileId: string;
+  version: number;
+  parentPlanId?: string;
+  question: string;
+  proposer: PlanProposer;
+  hypothesisIds?: string[];
+  gaps?: TriageGapRef[];
+  decisions: VariableDecision[];
+  moves?: PlanMove[];
+  processingBoundary: string;
+  createdAt: string;
+}
+
+export interface SelectionPlanList {
+  contractVersion: ContractVersion;
+  subjectId: string;
+  profileId: string;
+  plans: SelectionPlan[];
+}
+
+export interface ReviseSelectionPlanRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  actor: string;
+  moves: PlanMove[];
+}
+
+/** Observed baseline all scenarios branch from. asOf is required. */
+export interface ScenarioBaseline {
+  asOf: string;
+  description: string;
+  evidenceRefs?: string[];
+}
+
+/** Forecast horizon of a scenario; end must be after the baseline asOf. */
+export interface ScenarioHorizon {
+  label: string;
+  end: string;
+}
+
+/** Closed time window. */
+export interface TimeWindow {
+  start: string;
+  end: string;
+}
+
+/** A typed assumption. Only OBSERVED_BASELINE may cite evidenceRefs as observed fact; other kinds cite sourceRefs. */
+export interface Assumption {
+  id: string;
+  statement: string;
+  kind: "OBSERVED_BASELINE" | "EXOGENOUS_ASSUMPTION" | "MODEL_ASSUMPTION" | "HUMAN_ASSUMPTION" | "POLICY_ASSUMPTION";
+  sourceRefs?: string[];
+  evidenceRefs?: string[];
+  asOf: string;
+  validUntil?: string;
+}
+
+/** Optional numeric range for a RANGE expectation. */
+export interface ValueRange {
+  min?: number;
+  max?: number;
+  unit?: string;
+}
+
+/** Frozen, falsifiable statement about a future observation. */
+export interface ScenarioExpectation {
+  id: string;
+  indicator: string;
+  statement: string;
+  direction?: "INCREASE" | "DECREASE" | "NO_CHANGE" | "RANGE";
+  range?: ValueRange;
+  observationWindow: TimeWindow;
+  falsificationCondition: string;
+  /** ExpectationBasis (PRIOR, LITERATURE, DOMAIN_KNOWLEDGE, MODEL_PROPOSED_POST_HOC, HUMAN_POST_HOC, DERIVED_FROM_PRIOR_RUN, OTHER, UNKNOWN). Post-hoc provenance is never treated as prior. */
+  provenance: string;
+  observedDataAvailableAtCreation: boolean;
+  sourceRefs?: string[];
+}
+
+/** Caller-supplied probability with its basis and sources. The engine never generates one. */
+export interface ScenarioProbability {
+  value: number;
+  basis: string;
+  sourceRefs: string[];
+}
+
+/** One possible future branch. At least one expectation must be testable after the baseline. */
+export interface Scenario {
+  id: string;
+  title: string;
+  horizon: ScenarioHorizon;
+  assumptions: Assumption[];
+  mechanisms?: string[];
+  expectations: ScenarioExpectation[];
+  disconfirmingObservations?: string[];
+  affectedDimensions?: string[];
+  evidenceRefs?: string[];
+  unresolvedGapIds?: string[];
+  derivedFromHypothesisId?: string;
+  limitations?: string[];
+  probability?: ScenarioProbability;
+}
+
+/** Explicit relation between branches; scenarios need not be mutually exclusive. */
+export interface ScenarioRelation {
+  scenarioIds: string[];
+  kind: "MUTUALLY_EXCLUSIVE" | "OVERLAPPING" | "NESTED" | "CONFLICTING";
+  note?: string;
+}
+
+/** Append-only scenario set version. Curating creates a new version. */
+export interface ScenarioSet {
+  id: string;
+  researchRunId: string;
+  version: number;
+  question: string;
+  baseline: ScenarioBaseline;
+  nonExhaustive: boolean;
+  sharedEvidenceRefs?: string[];
+  scenarios: Scenario[];
+  relations?: ScenarioRelation[];
+  origin: "DETERMINISTIC_SCAFFOLD" | "HUMAN" | "MODEL" | "IMPORTED";
+  fromIterationId?: string;
+  createdAt: string;
+}
+
+/** Scenario set submitted by a consumer; id, version and createdAt are assigned by the engine. */
+export interface ScenarioSetDraft {
+  question: string;
+  baseline: ScenarioBaseline;
+  nonExhaustive: boolean;
+  sharedEvidenceRefs?: string[];
+  scenarios: Scenario[];
+  relations?: ScenarioRelation[];
+  origin: "DETERMINISTIC_SCAFFOLD" | "HUMAN" | "MODEL" | "IMPORTED";
+  fromIterationId?: string;
+}
+
+/** A later observation for one expectation. CONSISTENT/CONTRADICTS require evidenceRef. Observations at or before the set was created cannot test it. */
+export interface IndicatorObservation {
+  expectationId: string;
+  outcome: "CONSISTENT" | "CONTRADICTS" | "INCONCLUSIVE" | "NOT_OBSERVED";
+  evidenceRef?: string;
+  observedAt: string;
+  note?: string;
+}
+
+/** Whether later evidence kept an assumption. INVALIDATED requires evidenceRef. */
+export interface AssumptionCheck {
+  assumptionId: string;
+  result: "HOLDS" | "INVALIDATED" | "UNKNOWN";
+  evidenceRef?: string;
+  note?: string;
+}
+
+/** Evidence state of one scenario at one evaluation. */
+export interface ScenarioState {
+  scenarioId: string;
+  /** Evidence state of a branch. Never a probability. */
+  status: "UNTESTED" | "CONSISTENT_SO_FAR" | "WEAKENED" | "CONTRADICTED" | "INCONCLUSIVE";
+  reasons?: string[];
+  lastEvaluatedAt: string;
+}
+
+/** A falsification condition that fired on evidence. */
+export interface FiredFalsification {
+  scenarioId: string;
+  expectationId: string;
+  condition: string;
+  evidenceRef: string;
+}
+
+/** Status movement of one scenario. */
+export interface ScenarioStatusChange {
+  scenarioId: string;
+  /** Evidence state of a branch. Never a probability. */
+  from: "UNTESTED" | "CONSISTENT_SO_FAR" | "WEAKENED" | "CONTRADICTED" | "INCONCLUSIVE";
+  /** Evidence state of a branch. Never a probability. */
+  to: "UNTESTED" | "CONSISTENT_SO_FAR" | "WEAKENED" | "CONTRADICTED" | "INCONCLUSIVE";
+}
+
+/** What new evidence changed. It ranks nothing and never names a most likely future. */
+export interface ScenarioDelta {
+  fromEvaluationId?: string;
+  toEvaluationId: string;
+  strengthened?: ScenarioStatusChange[];
+  weakened?: ScenarioStatusChange[];
+  contradicted?: ScenarioStatusChange[];
+  unchanged?: string[];
+  assumptionsInvalidated?: string[];
+  falsificationsFired?: FiredFalsification[];
+  newlyRequiredEvidence?: string[];
+  explanation?: string[];
+}
+
+/** Append-only evaluation of one set version; carries forward earlier observations. */
+export interface ScenarioEvaluation {
+  id: string;
+  scenarioSetId: string;
+  setVersion: number;
+  researchRunId: string;
+  iterationId?: string;
+  observations: IndicatorObservation[];
+  assumptionChecks?: AssumptionCheck[];
+  states: ScenarioState[];
+  dataRequirements?: Record<string, unknown>[];
+  delta: ScenarioDelta;
+  evaluatedAt: string;
+}
+
+/** Submit a curated scenario set as the next version. */
+export interface CreateScenarioSetRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  scenarioSet: ScenarioSetDraft;
+}
+
+/** Draft scenarios deterministically from an iteration's competing hypotheses. Baseline and horizon are required. */
+export interface ScaffoldScenarioSetRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  iterationId?: string;
+  baseline: ScenarioBaseline;
+  horizon: ScenarioHorizon;
+}
+
+/** Evaluate a scenario set version against new observations. */
+export interface EvaluateScenariosRequest {
+  contractVersion: ContractVersion;
+  idempotencyKey: IdempotencyKey;
+  iterationId?: string;
+  observations?: IndicatorObservation[];
+  assumptionChecks?: AssumptionCheck[];
+}
+
+/** A stored scenario set version. */
+export interface ScenarioSetResult {
+  contractVersion: ContractVersion;
+  researchRunId: string;
+  scenarioSet: ScenarioSet;
+  skipped?: string[];
+}
+
+/** A stored scenario evaluation. */
+export interface ScenarioEvaluationResult {
+  contractVersion: ContractVersion;
+  researchRunId: string;
+  evaluation: ScenarioEvaluation;
+}
+
+/** Scenario history of a research run. Empty lists when none exist; scenarios are never synthesized. */
+export interface ScenarioAnalysis {
+  contractVersion: ContractVersion;
+  researchRunId: string;
+  currentSet?: ScenarioSet;
+  currentEvaluation?: ScenarioEvaluation;
+  sets: ScenarioSet[];
+  evaluations: ScenarioEvaluation[];
 }

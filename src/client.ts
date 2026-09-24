@@ -12,6 +12,26 @@ import type {
   ResearchResult,
   StartAnalysisRequest,
   Subject,
+  AnalysisList,
+  CreateDatasetProfileRequest,
+  CreateScenarioSetRequest,
+  DatasetProfile,
+  EvaluateScenariosRequest,
+  ReEvaluationRequest,
+  ReEvaluationResult,
+  ResearchRunList,
+  ResearchTimeline,
+  ReviseSelectionPlanRequest,
+  RunComparisonResult,
+  ScaffoldScenarioSetRequest,
+  ScenarioAnalysis,
+  ScenarioEvaluationResult,
+  ScenarioSetResult,
+  SelectionPlan,
+  SelectionPlanList,
+  TemporalOperationRequest,
+  TemporalOperationResult,
+  TriageRequest,
 } from "./contract.gen.ts";
 import { InsightError } from "./errors.ts";
 
@@ -20,6 +40,9 @@ export type Envelope<T> = Omit<T, "contractVersion" | "idempotencyKey"> & {
   contractVersion?: string;
   idempotencyKey?: string;
 };
+
+/** A request whose contractVersion the client fills in when omitted. */
+export type VersionOptional<T> = Omit<T, "contractVersion"> & { contractVersion?: string };
 
 export interface ClientOptions {
   /** Engine base URL, e.g. "http://127.0.0.1:8787". */
@@ -105,6 +128,71 @@ export class InsightClient {
     return this.#call("GET", `/research-runs/${enc(researchRunId)}`, undefined, options);
   }
 
+  /** POST /subjects/{subjectId}/dataset-profiles */
+  createDatasetProfile(subjectId: string, request: Envelope<CreateDatasetProfileRequest>, options?: CallOptions): Promise<DatasetProfile> {
+    return this.#call("POST", `/subjects/${enc(subjectId)}/dataset-profiles`, withEnvelope(request), options);
+  }
+  /** GET /subjects/{subjectId}/dataset-profiles/{profileId} */
+  getDatasetProfile(subjectId: string, profileId: string, options?: CallOptions): Promise<DatasetProfile> {
+    return this.#call("GET", `/subjects/${enc(subjectId)}/dataset-profiles/${enc(profileId)}`, undefined, options);
+  }
+  /** POST /subjects/{subjectId}/dataset-profiles/{profileId}/triage */
+  triage(subjectId: string, profileId: string, request: Envelope<TriageRequest>, options?: CallOptions): Promise<SelectionPlan> {
+    return this.#call("POST", `/subjects/${enc(subjectId)}/dataset-profiles/${enc(profileId)}/triage`, withEnvelope(request), options);
+  }
+  /** GET /subjects/{subjectId}/dataset-profiles/{profileId}/selection-plans */
+  listSelectionPlans(subjectId: string, profileId: string, options?: CallOptions): Promise<SelectionPlanList> {
+    return this.#call("GET", `/subjects/${enc(subjectId)}/dataset-profiles/${enc(profileId)}/selection-plans`, undefined, options);
+  }
+  /** GET /selection-plans/{planId} */
+  getSelectionPlan(planId: string, options?: CallOptions): Promise<SelectionPlan> {
+    return this.#call("GET", `/selection-plans/${enc(planId)}`, undefined, options);
+  }
+  /** POST /selection-plans/{planId}/revisions */
+  reviseSelectionPlan(planId: string, request: Envelope<ReviseSelectionPlanRequest>, options?: CallOptions): Promise<SelectionPlan> {
+    return this.#call("POST", `/selection-plans/${enc(planId)}/revisions`, withEnvelope(request), options);
+  }
+  /** GET /subjects/{subjectId}/analyses */
+  listAnalyses(subjectId: string, options?: CallOptions): Promise<AnalysisList> {
+    return this.#call("GET", `/subjects/${enc(subjectId)}/analyses`, undefined, options);
+  }
+  /** GET /subjects/{subjectId}/analyses/{analysisId}/compare/{otherAnalysisId} */
+  compareAnalyses(subjectId: string, analysisId: string, otherAnalysisId: string, options?: CallOptions): Promise<RunComparisonResult> {
+    return this.#call("GET", `/subjects/${enc(subjectId)}/analyses/${enc(analysisId)}/compare/${enc(otherAnalysisId)}`, undefined, options);
+  }
+  /** GET /subjects/{subjectId}/research-runs */
+  listResearchRuns(subjectId: string, options?: CallOptions): Promise<ResearchRunList> {
+    return this.#call("GET", `/subjects/${enc(subjectId)}/research-runs`, undefined, options);
+  }
+  /** POST /research-runs/{researchRunId}/re-evaluations */
+  reEvaluate(researchRunId: string, request: Envelope<ReEvaluationRequest>, options?: CallOptions): Promise<ReEvaluationResult> {
+    return this.#call("POST", `/research-runs/${enc(researchRunId)}/re-evaluations`, withEnvelope(request), options);
+  }
+  /** GET /research-runs/{researchRunId}/scenarios */
+  getScenarios(researchRunId: string, options?: CallOptions): Promise<ScenarioAnalysis> {
+    return this.#call("GET", `/research-runs/${enc(researchRunId)}/scenarios`, undefined, options);
+  }
+  /** POST /research-runs/{researchRunId}/scenario-sets */
+  createScenarioSet(researchRunId: string, request: Envelope<CreateScenarioSetRequest>, options?: CallOptions): Promise<ScenarioSetResult> {
+    return this.#call("POST", `/research-runs/${enc(researchRunId)}/scenario-sets`, withEnvelope(request), options);
+  }
+  /** POST /research-runs/{researchRunId}/scenario-sets/scaffold */
+  scaffoldScenarioSet(researchRunId: string, request: Envelope<ScaffoldScenarioSetRequest>, options?: CallOptions): Promise<ScenarioSetResult> {
+    return this.#call("POST", `/research-runs/${enc(researchRunId)}/scenario-sets/scaffold`, withEnvelope(request), options);
+  }
+  /** POST /research-runs/{researchRunId}/scenario-sets/{scenarioSetId}/evaluations */
+  evaluateScenarios(researchRunId: string, scenarioSetId: string, request: Envelope<EvaluateScenariosRequest>, options?: CallOptions): Promise<ScenarioEvaluationResult> {
+    return this.#call("POST", `/research-runs/${enc(researchRunId)}/scenario-sets/${enc(scenarioSetId)}/evaluations`, withEnvelope(request), options);
+  }
+  /** GET /research-runs/{researchRunId}/timeline */
+  getResearchTimeline(researchRunId: string, options?: CallOptions): Promise<ResearchTimeline> {
+    return this.#call("GET", `/research-runs/${enc(researchRunId)}/timeline`, undefined, options);
+  }
+  /** POST /temporal-operations */
+  applyTemporalOperation(request: VersionOptional<TemporalOperationRequest>, options?: CallOptions): Promise<TemporalOperationResult> {
+    return this.#call("POST", `/temporal-operations`, withVersion(request), options);
+  }
+
   async #call<T>(method: string, path: string, body: unknown, options?: CallOptions): Promise<T> {
     const timeout = AbortSignal.timeout(this.#timeoutMs);
     const signal = options?.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
@@ -145,6 +233,11 @@ export class InsightClient {
 function withEnvelope<T extends object>(request: T): T & { contractVersion: string; idempotencyKey: string } {
   const r = request as T & { contractVersion?: string; idempotencyKey?: string };
   return { ...request, contractVersion: r.contractVersion || CONTRACT_VERSION, idempotencyKey: r.idempotencyKey || newIdempotencyKey() };
+}
+
+function withVersion<T extends object>(request: T): T & { contractVersion: string } {
+  const r = request as T & { contractVersion?: string };
+  return { ...request, contractVersion: r.contractVersion || CONTRACT_VERSION };
 }
 
 function enc(value: string): string {

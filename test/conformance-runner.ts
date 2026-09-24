@@ -1,5 +1,5 @@
 // Runs contracts/public-engine/v1/fixtures through the TypeScript SDK with
-// the same rules as the Go runner (sdk/go/conformance), so both SDKs are held
+// the same rules as the Go runner (insight-sdk-go/conformance), so both SDKs are held
 // to identical behavior against a live engine.
 import { readFileSync, readdirSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -108,6 +108,38 @@ function call(c: InsightClient, op: string, p: Record<string, string>, request: 
       return c.appendIteration(required("researchRunId"), request);
     case "getResearchRun":
       return c.getResearchRun(required("researchRunId"));
+    case "createDatasetProfile":
+      return c.createDatasetProfile(required("subjectId"), request);
+    case "getDatasetProfile":
+      return c.getDatasetProfile(required("subjectId"), required("profileId"));
+    case "triage":
+      return c.triage(required("subjectId"), required("profileId"), request);
+    case "listSelectionPlans":
+      return c.listSelectionPlans(required("subjectId"), required("profileId"));
+    case "getSelectionPlan":
+      return c.getSelectionPlan(required("planId"));
+    case "reviseSelectionPlan":
+      return c.reviseSelectionPlan(required("planId"), request);
+    case "listAnalyses":
+      return c.listAnalyses(required("subjectId"));
+    case "compareAnalyses":
+      return c.compareAnalyses(required("subjectId"), required("analysisId"), required("otherAnalysisId"));
+    case "listResearchRuns":
+      return c.listResearchRuns(required("subjectId"));
+    case "reEvaluate":
+      return c.reEvaluate(required("researchRunId"), request);
+    case "getScenarios":
+      return c.getScenarios(required("researchRunId"));
+    case "createScenarioSet":
+      return c.createScenarioSet(required("researchRunId"), request);
+    case "scaffoldScenarioSet":
+      return c.scaffoldScenarioSet(required("researchRunId"), request);
+    case "evaluateScenarios":
+      return c.evaluateScenarios(required("researchRunId"), required("scenarioSetId"), request);
+    case "getResearchTimeline":
+      return c.getResearchTimeline(required("researchRunId"));
+    case "applyTemporalOperation":
+      return c.applyTemporalOperation(request);
   }
   throw new Error(`unknown op ${op}`);
 }
