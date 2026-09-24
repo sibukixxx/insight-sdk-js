@@ -47,7 +47,7 @@ const sealed = analytical.sealAnalyticalArtifact(draft); // sets artifactHash, v
 
 | SDK version | Contract versions | Pinned contract source |
 |---|---|---|
-| 0.4.x | `1` (adds `EngineInfo.modelBacked`, insight #104) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
+| 0.4.x | `1` (adds `EngineInfo.modelBacked`) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.3.x | `1` (adds modelBindings / modelRouting, timeline scenarioEvents, comparison informational diff; `analytical` module) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.2.x | `1` (adds InputSource, ExecutionProfile, run comparison, re-evaluation, timeline, temporal operations, scenarios, data triage) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.1.x | `1` (original v0 surface) | insight `e6e402d` |
@@ -73,17 +73,13 @@ Fixtures whose `engine` is `model_backed` need an engine with a model. The insig
 ```sh
 # in a checkout of sibukixxx/insight
 go run ./cmd/insight-scripted-llm -addr 127.0.0.1:8788 &
-# model-backed engine: fixture 17 asserts allowedModels[0] == "scripted-model-large" and binds "scripted-model"
-go run ./cmd/insight-lab -port 8787 -no-browser -db /tmp/insight-model.db -base-url http://127.0.0.1:8788 \
-  -model scripted-model -allowed-models scripted-model-large -api-key scripted &
-# deterministic engine: fixtures 08/09 need -input-root and -heavy-dir
-go run ./cmd/insight-lab -port 8789 -no-browser -db /tmp/insight-det.db \
-  -input-root <this repo>/contract/v1/fixtures/data -heavy-dir /tmp/heavy &
-# here (INSIGHT_REQUIRE_CONFORMANCE=1 fails instead of skipping when an engine is unreachable)
-INSIGHT_DETERMINISTIC_URL=http://127.0.0.1:8789 INSIGHT_MODEL_BACKED_URL=http://127.0.0.1:8787 INSIGHT_REQUIRE_CONFORMANCE=1 npm test
+go run ./cmd/insight-lab -port 8787 -no-browser -base-url http://127.0.0.1:8788 -model scripted -api-key scripted &
+go run ./cmd/insight-lab -port 8789 -no-browser -input-root <this repo>/contract/v1/fixtures/data -heavy-dir /tmp/heavy &
+# here
+INSIGHT_DETERMINISTIC_URL=http://127.0.0.1:8789 INSIGHT_MODEL_BACKED_URL=http://127.0.0.1:8787 npm test
 ```
 
-Give each engine its own `-db`; without it both would share the default database in the OS data directory. With that setup all 17 pinned fixtures pass (verified 2026-09-25: this repository at 0.4.0 against insight `main` `c447f9f`, 46 tests). The canonical description of this setup is insight `docs/public-engine-contract.md` ("Running model-backed fixtures outside this repository"); if the two disagree, insight wins.
+With that setup all 16 pinned fixtures pass (verified 2026-09-24 against insight `main`).
 
 ## License
 
