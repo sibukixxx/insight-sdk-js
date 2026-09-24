@@ -4,7 +4,7 @@
 export const CONTRACT_SCHEMA = "insight-lab.public-engine";
 export const CONTRACT_VERSION = "1";
 
-export const ERROR_CODES = ["INVALID_REQUEST","UNSUPPORTED_CONTRACT_VERSION","NOT_FOUND","IDEMPOTENCY_CONFLICT","IDENTITY_CONFLICT","ANALYSIS_NOT_COMPLETED","ANALYSIS_HAS_NO_HYPOTHESES","MIXED_ANALYSIS_RUNS","STALE_ITERATION","EXECUTION_PROFILE_UNAVAILABLE","INPUT_SOURCE_UNAVAILABLE","INPUT_VERIFICATION_FAILED","INTERNAL"] as const;
+export const ERROR_CODES = ["INVALID_REQUEST","UNSUPPORTED_CONTRACT_VERSION","NOT_FOUND","IDEMPOTENCY_CONFLICT","IDENTITY_CONFLICT","ANALYSIS_NOT_COMPLETED","ANALYSIS_HAS_NO_HYPOTHESES","MIXED_ANALYSIS_RUNS","STALE_ITERATION","EXECUTION_PROFILE_UNAVAILABLE","MODEL_BINDING_UNAVAILABLE","INPUT_SOURCE_UNAVAILABLE","INPUT_VERIFICATION_FAILED","INTERNAL"] as const;
 export type ContractErrorCode = (typeof ERROR_CODES)[number];
 
 export type ContractVersion = "1";
@@ -43,6 +43,13 @@ export interface EngineInfo {
   analyticalArtifact: SchemaRef;
   executionProfiles?: ExecutionProfileInfo[];
   inputSourceKinds?: ("INLINE_DOCUMENT" | "ANALYTICAL_ARTIFACT" | "RAW_ARTIFACT")[];
+  modelRouting?: ModelRouting;
+}
+
+/** Per-run model binding extension point (#65): stages a caller may bind and the models the engine operator allowed (the configured model is always allowed). The engine never chooses models itself; bindings are execution config recorded in provenance.execution.llm.models and the execution fingerprint, and never change research semantics. */
+export interface ModelRouting {
+  stages: string[];
+  allowedModels: string[];
 }
 
 export interface CreateSubjectRequest {
@@ -103,6 +110,8 @@ export interface StartAnalysisRequest {
   note?: string;
   semanticAnalysisMode?: "DISCOVERY" | "DATASET_ANALYSIS" | "RESEARCH_REVIEW";
   executionProfile?: ExecutionProfile;
+  /** Stage -> model. Unknown stage is INVALID_REQUEST; a model the operator did not allow (or no model endpoint) is MODEL_BINDING_UNAVAILABLE. */
+  modelBindings?: Record<string, string>;
 }
 
 /** The run's execution and input snapshots, verbatim. A snapshot the run never recorded is omitted, never sent empty. */
@@ -361,6 +370,10 @@ export interface ReEvaluationRecord {
   evidenceChanges: EvidenceChanges;
   affectedGapIds: string[];
   affectedHypothesisIds: string[];
+  /** Latest scenario set whose scenarios the change touches (#66). */
+  affectedScenarioSetId?: string;
+  /** Scenarios touched via affected hypotheses, gaps or removed/changed evidence. Refs only; status changes need an explicit scenario evaluation. */
+  affectedScenarioIds?: string[];
   /** Partial re-evaluation is not yet proven safe, so the whole iteration is re-evaluated. */
   scope: "FULL";
   scopeReason: string;
@@ -534,7 +547,7 @@ export interface InputSourceReceipt {
 }
 
 export interface ErrorBody {
-  code: "INVALID_REQUEST" | "UNSUPPORTED_CONTRACT_VERSION" | "NOT_FOUND" | "IDEMPOTENCY_CONFLICT" | "IDENTITY_CONFLICT" | "ANALYSIS_NOT_COMPLETED" | "ANALYSIS_HAS_NO_HYPOTHESES" | "MIXED_ANALYSIS_RUNS" | "STALE_ITERATION" | "EXECUTION_PROFILE_UNAVAILABLE" | "INPUT_SOURCE_UNAVAILABLE" | "INPUT_VERIFICATION_FAILED" | "INTERNAL";
+  code: "INVALID_REQUEST" | "UNSUPPORTED_CONTRACT_VERSION" | "NOT_FOUND" | "IDEMPOTENCY_CONFLICT" | "IDENTITY_CONFLICT" | "ANALYSIS_NOT_COMPLETED" | "ANALYSIS_HAS_NO_HYPOTHESES" | "MIXED_ANALYSIS_RUNS" | "STALE_ITERATION" | "EXECUTION_PROFILE_UNAVAILABLE" | "MODEL_BINDING_UNAVAILABLE" | "INPUT_SOURCE_UNAVAILABLE" | "INPUT_VERIFICATION_FAILED" | "INTERNAL";
   message: string;
 }
 
