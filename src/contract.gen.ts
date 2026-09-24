@@ -268,6 +268,8 @@ export interface ExecutionAxisDiff {
   state: AxisState;
   /** Field-level diff: engineVersion, gitCommit, gitDirty, executionMode, semanticAnalysisMode, ruleVersions.*, promptVersion, promptFingerprint, provider, models.*, parameters. */
   changes: FieldChange[];
+  /** Recorded settings excluded from the execution fingerprint by design (executionProfile.requested / executionProfile.resolved). Visible, never an instrument change. */
+  informational?: FieldChange[];
 }
 
 export interface InputAxisDiff {
@@ -408,7 +410,23 @@ export interface ResearchTimeline {
   hypothesisEvents: HypothesisEvent[];
   insightVersions: InsightVersion[];
   instrumentChanges: InstrumentChange[];
+  /** Future lane: scenario (#66) evaluations against later observations, in evaluation order. Separate from evidence and instrument lanes. */
+  scenarioEvents?: TimelineScenarioEvent[];
   limitations: string[];
+}
+
+/** One append-only scenario evaluation summarized for the timeline. Ranks nothing and never names a most likely future. */
+export interface TimelineScenarioEvent {
+  evaluationId: string;
+  scenarioSetId: string;
+  setVersion: number;
+  iterationId?: string;
+  evaluatedAt: string;
+  strengthened?: ScenarioStatusChange[];
+  weakened?: ScenarioStatusChange[];
+  contradicted?: ScenarioStatusChange[];
+  falsificationsFired?: FiredFalsification[];
+  assumptionsInvalidated?: string[];
 }
 
 export interface TimelineIteration {
