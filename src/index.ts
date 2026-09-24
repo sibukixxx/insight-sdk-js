@@ -3,3 +3,4 @@ export type { CallOptions, ClientOptions, Envelope, VersionOptional } from "./cl
 export { InsightError } from "./errors.ts";
 export type { InsightErrorCode } from "./errors.ts";
 export * from "./contract.gen.ts";
+export * as analytical from "./analytical.ts";
