@@ -47,6 +47,7 @@ const sealed = analytical.sealAnalyticalArtifact(draft); // sets artifactHash, v
 
 | SDK version | Contract versions | Pinned contract source |
 |---|---|---|
+| 0.4.x | `1` (adds `EngineInfo.modelBacked`) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.3.x | `1` (adds modelBindings / modelRouting, timeline scenarioEvents, comparison informational diff; `analytical` module) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.2.x | `1` (adds InputSource, ExecutionProfile, run comparison, re-evaluation, timeline, temporal operations, scenarios, data triage) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.1.x | `1` (original v0 surface) | insight `e6e402d` |

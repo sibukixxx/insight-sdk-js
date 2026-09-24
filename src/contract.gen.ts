@@ -44,6 +44,8 @@ export interface EngineInfo {
   executionProfiles?: ExecutionProfileInfo[];
   inputSourceKinds?: ("INLINE_DOCUMENT" | "ANALYTICAL_ARTIFACT" | "RAW_ARTIFACT")[];
   modelRouting?: ModelRouting;
+  /** True when analyses use a configured model and can form hypotheses. False means deterministic only: research runs are refused with ANALYSIS_HAS_NO_HYPOTHESES. */
+  modelBacked?: boolean;
 }
 
 /** Per-run model binding extension point (#65): stages a caller may bind and the models the engine operator allowed (the configured model is always allowed). The engine never chooses models itself; bindings are execution config recorded in provenance.execution.llm.models and the execution fingerprint, and never change research semantics. */
