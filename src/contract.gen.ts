@@ -43,6 +43,10 @@ export interface EngineInfo {
   analyticalArtifact: SchemaRef;
   executionProfiles?: ExecutionProfileInfo[];
   inputSourceKinds?: ("INLINE_DOCUMENT" | "ANALYTICAL_ARTIFACT" | "RAW_ARTIFACT")[];
+  /** Semantic reasoning specializations supported by the same research core. */
+  supportedReasoningProfiles?: ("GENERAL_RESEARCH" | "CUSTOMER_INSIGHT")[];
+  /** Profile used when startAnalysis omits reasoningProfile; currently GENERAL_RESEARCH. */
+  defaultReasoningProfile?: "GENERAL_RESEARCH" | "CUSTOMER_INSIGHT";
   modelRouting?: ModelRouting;
   /** True when analyses use a configured model and can form hypotheses. False means deterministic only: research runs are refused with ANALYSIS_HAS_NO_HYPOTHESES. */
   modelBacked?: boolean;
@@ -74,7 +78,8 @@ export interface Subject {
 export interface EvidenceDocument {
   /** Caller's stable reference, unique within a subject. */
   externalRef: string;
-  source: "interview" | "review" | "support" | "sales" | "survey" | "job_posting" | "social_post" | "dataset";
+  /** Evidence source category. Generic categories are preferred when no legacy domain-specific category applies. */
+  source: "interview" | "review" | "support" | "sales" | "survey" | "job_posting" | "social_post" | "dataset" | "document" | "report" | "paper" | "web" | "record" | "other";
   title?: string;
   content: string;
   metadata?: Metadata;
@@ -111,6 +116,10 @@ export interface StartAnalysisRequest {
   label?: string;
   note?: string;
   semanticAnalysisMode?: "DISCOVERY" | "DATASET_ANALYSIS" | "RESEARCH_REVIEW";
+  /** Optional domain-neutral research question that focuses model-backed semantic analysis. It is semantic input, not execution configuration; the input fingerprint changes when the question changes. */
+  researchQuestion?: string;
+  /** Optional semantic specialization of the shared research core. Omitted means GENERAL_RESEARCH. The profile is execution/semantic configuration and does not change evidence identity. */
+  reasoningProfile?: "GENERAL_RESEARCH" | "CUSTOMER_INSIGHT";
   executionProfile?: ExecutionProfile;
   /** Stage -> model. Unknown stage is INVALID_REQUEST; a model the operator did not allow (or no model endpoint) is MODEL_BINDING_UNAVAILABLE. */
   modelBindings?: Record<string, string>;
@@ -131,6 +140,10 @@ export interface AnalysisRun {
   label?: string;
   note?: string;
   semanticAnalysisMode?: string;
+  /** The question that focused this analysis, when one was supplied. */
+  researchQuestion?: string;
+  /** Resolved semantic reasoning profile used by this analysis. */
+  reasoningProfile?: "GENERAL_RESEARCH" | "CUSTOMER_INSIGHT";
   executionMode?: "deterministic" | "model_backed";
   executionProfile?: ExecutionProfileResolution;
   engine?: EngineBuild;
@@ -276,6 +289,8 @@ export interface ExecutionAxisDiff {
 
 export interface InputAxisDiff {
   state: AxisState;
+  /** Present when the semantic research question changed; this is an input change. */
+  researchQuestion?: FieldChange;
   /** source:contentHash:metadataHash identities. */
   documentsAdded: string[];
   documentsRemoved: string[];
