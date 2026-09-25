@@ -100,8 +100,8 @@ Unknown response fields are ignored; a different `contractVersion` fails with `U
 
 ## Release and publication state
 
-- **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.4.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.4.0` (runs `prepack` to build `dist/`).
-- Current `main` targets **0.6.0** (question-conditioned research + ReasoningProfile); tag it only after the release verification below is complete.
+- **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.6.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.6.0` (runs `prepack` to build `dist/`).
+- **v0.6.0 is tagged and current.** It contains question-conditioned research (#108) and ReasoningProfile (#111/#112), with the 18-fixture contract snapshot pinned to Insight `e4a455e`.
 - Package name is fixed as `@sibukixxx/insight-sdk`; `insightContractVersions` in `package.json` names the supported Public Engine Contract versions (`1`).
 - Release verification is local (GitHub Actions is not a prerequisite):
 
