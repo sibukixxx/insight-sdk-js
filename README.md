@@ -75,10 +75,15 @@ const sealed = analytical.sealAnalyticalArtifact(draft); // sets artifactHash, v
 
 | SDK version | Contract versions | Pinned contract source |
 |---|---|---|
+| 0.6.x | `1` (adds domain-neutral `researchQuestion`, question input diff and generic evidence sources, insight #108; explicit `GENERAL_RESEARCH` / `CUSTOMER_INSIGHT` ReasoningProfile, insight #111/#112) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.4.x | `1` (adds `EngineInfo.modelBacked`, insight #104) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.3.x | `1` (adds modelBindings / modelRouting, timeline scenarioEvents, comparison informational diff; `analytical` module) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.2.x | `1` (adds InputSource, ExecutionProfile, run comparison, re-evaluation, timeline, temporal operations, scenarios, data triage) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.1.x | `1` (original v0 surface) | insight `e6e402d` |
+
+0.5.x was intentionally not cut for this SDK: 0.6.0 jumps straight from 0.4.0 so that both standalone SDKs share one feature line for the same upstream contract (insight-sdk-go v0.5 = #108, v0.6 = #111/#112; this SDK's 0.6 covers both).
+
+0.6.0 makes the analysis question first-class semantic input: set `StartAnalysisRequest.researchQuestion` when later research answers a specific question; leave it unset for open-ended discovery. Same evidence under a different question is reported as an input change. It also adds an explicit reasoning specialization axis: omit `reasoningProfile` for the domain-neutral `GENERAL_RESEARCH` default and set `CUSTOMER_INSIGHT` only when the original hidden-need/JTBD specialization is desired. A profile change is an execution/semantic change, not an evidence change; the SDK never infers a profile. `REASONING_PROFILES` / `ReasoningProfile` are generated from the contract. Public Contract v1 does not define a generic `hypothesis` field on `AnalysisResults` at this revision, so none is exposed; legacy fields are unchanged.
 
 Unknown response fields are ignored; a different `contractVersion` fails with `UNSUPPORTED_CONTRACT_VERSION`. 0.2.0 added InputSource / RawArtifact (insight #90, #4) and ExecutionProfile (insight #91, #5) additively; every 0.1 call keeps working. Requests with an idempotency key get `contractVersion` and a random `idempotencyKey` filled in; stateless requests (e.g. `applyTemporalOperation`) get only `contractVersion`.
 
@@ -96,6 +101,7 @@ Unknown response fields are ignored; a different `contractVersion` fails with `U
 ## Release and publication state
 
 - **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.4.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.4.0` (runs `prepack` to build `dist/`).
+- Current `main` targets **0.6.0** (question-conditioned research + ReasoningProfile); tag it only after the release verification below is complete.
 - Package name is fixed as `@sibukixxx/insight-sdk`; `insightContractVersions` in `package.json` names the supported Public Engine Contract versions (`1`).
 - Release verification is local (GitHub Actions is not a prerequisite):
 
@@ -125,7 +131,7 @@ go run ./cmd/insight-lab -port 8789 -no-browser -db /tmp/insight-det.db \
 INSIGHT_DETERMINISTIC_URL=http://127.0.0.1:8789 INSIGHT_MODEL_BACKED_URL=http://127.0.0.1:8787 INSIGHT_REQUIRE_CONFORMANCE=1 npm test
 ```
 
-Give each engine its own `-db`; without it both would share the default database in the OS data directory. With that setup all 17 pinned fixtures pass (verified 2026-09-25: this repository at 0.4.0 against insight `main` `c447f9f`, 46 tests). The canonical description of this setup is insight `docs/public-engine-contract.md` ("Running model-backed fixtures outside this repository"); if the two disagree, insight wins.
+Give each engine its own `-db`; without it both would share the default database in the OS data directory. With that setup all 18 pinned fixtures pass, plus `test/reasoning-profile.live.test.ts` (default profile, question input diff, unknown profile) against the model-backed engine (verified 2026-09-25: this repository at 0.6.0 against insight `main` `e4a455e`, 53 tests). The canonical description of this setup is insight `docs/public-engine-contract.md` ("Running model-backed fixtures outside this repository"); if the two disagree, insight wins.
 
 ## License
 

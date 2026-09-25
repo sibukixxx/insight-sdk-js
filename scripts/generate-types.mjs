@@ -21,6 +21,10 @@ export function generate(schema) {
     `export const ERROR_CODES = ${JSON.stringify(Object.keys(schema["x-errorCodes"]))} as const;`,
     "export type ContractErrorCode = (typeof ERROR_CODES)[number];",
     "",
+    "/** Semantic reasoning profiles, in contract order (EngineInfo.defaultReasoningProfile enum). */",
+    `export const REASONING_PROFILES = ${JSON.stringify(reasoningProfiles(schema))} as const;`,
+    "export type ReasoningProfile = (typeof REASONING_PROFILES)[number];",
+    "",
   ];
   for (const [name, def] of Object.entries(schema.$defs)) {
     if (def.description) lines.push(`/** ${def.description} */`);
@@ -37,6 +41,22 @@ export function generate(schema) {
     }
   }
   return lines.join("\n");
+}
+
+// The schema inlines the ReasoningProfile enum at several sites; take the
+// EngineInfo default as the source and refuse to generate if any site drifts.
+function reasoningProfiles(schema) {
+  const defs = schema.$defs;
+  const source = defs.EngineInfo.properties.defaultReasoningProfile.enum;
+  const sites = {
+    "EngineInfo.supportedReasoningProfiles": defs.EngineInfo.properties.supportedReasoningProfiles.items.enum,
+    "StartAnalysisRequest.reasoningProfile": defs.StartAnalysisRequest.properties.reasoningProfile.enum,
+    "AnalysisRun.reasoningProfile": defs.AnalysisRun.properties.reasoningProfile.enum,
+  };
+  for (const [site, values] of Object.entries(sites)) {
+    if (JSON.stringify(values) !== JSON.stringify(source)) throw new Error(`reasoning profile enum drift at ${site}`);
+  }
+  return source;
 }
 
 function tsType(prop) {
