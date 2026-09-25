@@ -4,3 +4,5 @@ export { InsightError } from "./errors.ts";
 export type { InsightErrorCode } from "./errors.ts";
 export * from "./contract.gen.ts";
 export * as analytical from "./analytical.ts";
+
+export * from "./artifact.ts";
