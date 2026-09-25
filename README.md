@@ -63,8 +63,22 @@ Unknown response fields are ignored; a different `contractVersion` fails with `U
 | `npm run typecheck` | Type-check with `tsc` |
 | `npm test` | Unit, drift and (with `INSIGHT_DETERMINISTIC_URL` / `INSIGHT_MODEL_BACKED_URL`) live conformance tests. Fixtures 08/09 need the engine started with `-input-root contract/v1/fixtures/data -heavy-dir <dir>` |
 | `npm run build` | Emit `dist/` (not committed) for packaging |
+| `npm run verify:pack` | `npm pack`, install the tarball into a clean temp project, type-check and import `@sibukixxx/insight-sdk` and `@sibukixxx/insight-sdk/analytical` |
 
-Not published to npm yet.
+## Release and publication state
+
+- **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.4.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.4.0` (runs `prepack` to build `dist/`).
+- Package name is fixed as `@sibukixxx/insight-sdk`; `insightContractVersions` in `package.json` names the supported Public Engine Contract versions (`1`).
+- Release verification is local (GitHub Actions is not a prerequisite):
+
+```sh
+npm ci
+npm run check-generated && npm run typecheck && npm test
+npm run verify:pack
+# optional live conformance against a compatible engine (see below)
+```
+
+- The pinned contract snapshot names its exact upstream insight commit in [contract/PROVENANCE.md](contract/PROVENANCE.md).
 
 ### Model-backed fixtures without a real LLM
 

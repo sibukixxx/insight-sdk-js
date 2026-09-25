@@ -35,7 +35,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "node --test \"test/*.test.ts\"",
-    "prepack": "npm run check-generated && npm run build"
+    "prepack": "npm run check-generated && npm run build",
+    "verify:pack": "node scripts/verify-pack.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
