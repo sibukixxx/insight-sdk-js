@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { InsightClient } from "../src/index.ts";
+import { InsightClient, REASONING_PROFILES, type ReasoningProfile } from "../src/index.ts";
 
 interface Captured {
   url: string;
@@ -39,4 +39,26 @@ test("applyTemporalOperation fills only contractVersion because the request has 
   assert.equal(captured[0]?.url, "http://engine/api/public/v1/temporal-operations");
   assert.equal(captured[0]?.body.contractVersion, "1");
   assert.equal("idempotencyKey" in captured[0]!.body, false);
+});
+
+test("startAnalysis forwards researchQuestion and reasoningProfile verbatim when both are set", async () => {
+  const captured: Captured[] = [];
+  const client = new InsightClient({ baseUrl: "http://engine", fetch: recordingFetch('{"contractVersion":"1","analysisId":"a","status":"queued"}', captured) });
+  const profile: ReasoningProfile = "CUSTOMER_INSIGHT";
+  await client.startAnalysis("s", { researchQuestion: "  Why did it change?  ", reasoningProfile: profile });
+  assert.equal(captured[0]?.url, "http://engine/api/public/v1/subjects/s/analyses");
+  assert.equal(captured[0]?.body.researchQuestion, "  Why did it change?  ");
+  assert.equal(captured[0]?.body.reasoningProfile, "CUSTOMER_INSIGHT");
+});
+
+test("startAnalysis omits reasoningProfile when the caller leaves it unset so the engine default applies", async () => {
+  const captured: Captured[] = [];
+  const client = new InsightClient({ baseUrl: "http://engine", fetch: recordingFetch('{"contractVersion":"1","analysisId":"a","status":"queued"}', captured) });
+  await client.startAnalysis("s", {});
+  assert.equal("reasoningProfile" in captured[0]!.body, false);
+  assert.equal("researchQuestion" in captured[0]!.body, false);
+});
+
+test("REASONING_PROFILES lists GENERAL_RESEARCH first when generated from the contract", () => {
+  assert.deepEqual([...REASONING_PROFILES], ["GENERAL_RESEARCH", "CUSTOMER_INSIGHT"]);
 });
