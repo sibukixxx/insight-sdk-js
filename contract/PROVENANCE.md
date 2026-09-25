@@ -6,7 +6,7 @@
 |---|---|
 | Upstream repository | https://github.com/sibukixxx/insight |
 | Upstream path | `contracts/public-engine/v1/` |
-| Upstream revision | `c447f9f4ed96bddaba859a64745cfd7a9064357c` (insight `main`, PR #104) |
+| Upstream revision | `e4a455ec80c5f2cb934b8f369a561a4c14e22d9b` (insight `main`; `contracts/` last changed at `51bc77908689f728c38b2555105bf5f24c329791`, PRs #108/#111/#112/#114 — the same contract as the insight-sdk-go v0.6 pin `51bc779`) |
 | Contract version | `1` |
 | Synced | 2026-09-25 |
 
@@ -14,4 +14,4 @@ To resync, copy the upstream directory at a new revision, update this table and 
 
 ## Analytical Artifact v1
 
-`contract/analytical-artifact/v1/` (`schema.json`, `temporal-operation.schema.json` and `fixtures/`) is a test snapshot of insight `contracts/analytical-artifact/v1/` at revision `c447f9f4ed96bddaba859a64745cfd7a9064357c` (insight `main`, PR #104, 2026-09-25). Module `analytical` validates every pinned fixture.
+`contract/analytical-artifact/v1/` (`schema.json`, `temporal-operation.schema.json` and `fixtures/`) is a test snapshot of insight `contracts/analytical-artifact/v1/` at revision `e4a455ec80c5f2cb934b8f369a561a4c14e22d9b` (insight `main`, 2026-09-25; unchanged since PR #104). Module `analytical` validates every pinned fixture.
