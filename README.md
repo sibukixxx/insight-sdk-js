@@ -47,10 +47,13 @@ const sealed = analytical.sealAnalyticalArtifact(draft); // sets artifactHash, v
 
 | SDK version | Contract versions | Pinned contract source |
 |---|---|---|
+| 0.6.x | `1` (adds `researchQuestion`, explicit ReasoningProfile, generic evidence-source categories and typed Research Artifact hypothesis view; insight #108/#111/#112) |
 | 0.4.x | `1` (adds `EngineInfo.modelBacked`, insight #104) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.3.x | `1` (adds modelBindings / modelRouting, timeline scenarioEvents, comparison informational diff; `analytical` module) | `contract/v1` + `contract/analytical-artifact/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.2.x | `1` (adds InputSource, ExecutionProfile, run comparison, re-evaluation, timeline, temporal operations, scenarios, data triage) | `contract/v1` — see [contract/PROVENANCE.md](contract/PROVENANCE.md) |
 | 0.1.x | `1` (original v0 surface) | insight `e6e402d` |
+
+`researchQuestion` is semantic input. `ReasoningProfile` is an independent explicit axis: `GENERAL_RESEARCH` is the engine default and `CUSTOMER_INSIGHT` is opt-in; profile changes are execution/semantic configuration changes rather than evidence changes. `viewResearchArtifact()` exposes the domain-neutral `hypothesis` alias while retaining forward compatibility.
 
 Unknown response fields are ignored; a different `contractVersion` fails with `UNSUPPORTED_CONTRACT_VERSION`. 0.2.0 added InputSource / RawArtifact (insight #90, #4) and ExecutionProfile (insight #91, #5) additively; every 0.1 call keeps working. Requests with an idempotency key get `contractVersion` and a random `idempotencyKey` filled in; stateless requests (e.g. `applyTemporalOperation`) get only `contractVersion`.
 
@@ -67,7 +70,7 @@ Unknown response fields are ignored; a different `contractVersion` fails with `U
 
 ## Release and publication state
 
-- **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.4.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.4.0` (runs `prepack` to build `dist/`).
+- **Not published to npm.** Releases are git tags (`v0.1.0` … `v0.4.0`) on this repository. Install from a tag or a packed tarball, e.g. `npm install github:sibukixxx/insight-sdk-js#v0.6.0` (runs `prepack` to build `dist/`).
 - Package name is fixed as `@sibukixxx/insight-sdk`; `insightContractVersions` in `package.json` names the supported Public Engine Contract versions (`1`).
 - Release verification is local (GitHub Actions is not a prerequisite):
 
@@ -97,7 +100,7 @@ go run ./cmd/insight-lab -port 8789 -no-browser -db /tmp/insight-det.db \
 INSIGHT_DETERMINISTIC_URL=http://127.0.0.1:8789 INSIGHT_MODEL_BACKED_URL=http://127.0.0.1:8787 INSIGHT_REQUIRE_CONFORMANCE=1 npm test
 ```
 
-Give each engine its own `-db`; without it both would share the default database in the OS data directory. With that setup all 17 pinned fixtures pass (verified 2026-09-25: this repository at 0.4.0 against insight `main` `c447f9f`, 46 tests). The canonical description of this setup is insight `docs/public-engine-contract.md` ("Running model-backed fixtures outside this repository"); if the two disagree, insight wins.
+Give each engine its own `-db`; without it both would share the default database in the OS data directory. With that setup the pinned contract contains 18 fixtures; fixture 18 covers default/explicit ReasoningProfile, profile-only comparison attribution and invalid profiles. The pinned upstream revision is `07104a7d05601c7885a9be5e3c18a133dc132dec`. The canonical description of this setup is insight `docs/public-engine-contract.md` ("Running model-backed fixtures outside this repository"); if the two disagree, insight wins.
 
 ## License
 
